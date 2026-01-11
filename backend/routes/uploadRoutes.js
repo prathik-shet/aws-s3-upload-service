@@ -5,37 +5,26 @@ const allowedFolders = require('../utils/allowedFolders');
 
 const router = express.Router();
 
-// Multer memory storage (IMPORTANT)
+// Multer memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'video/mp4',
-      'video/webm'
-    ];
-
-    if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error('Only images and videos allowed'));
-    }
-
-    cb(null, true);
-  }
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
-    const folder = (req.body.folder || '').trim().toLowerCase();
+    console.log('🔍 BODY:', req.body);
+    console.log('🔍 FILE:', req.file ? req.file.originalname : 'NO FILE');
 
-    console.log('📁 Folder received:', folder);
+    if (!req.file) {
+      return res.status(400).json({ error: 'File not received' });
+    }
+
+    const folder = (req.body.folder || '').trim().toLowerCase();
+    console.log('📁 Folder:', folder);
 
     if (!allowedFolders.includes(folder)) {
-      return res.status(400).json({ error: 'Invalid folder selected' });
+      return res.status(400).json({ error: `Invalid folder: ${folder}` });
     }
 
     const ext = req.file.originalname.split('.').pop();
@@ -49,7 +38,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       ACL: 'public-read'
     };
 
+    console.log('🚀 Uploading to S3:', params.Bucket, params.Key);
+
     const result = await s3.upload(params).promise();
+
+    console.log('✅ S3 upload success:', result.Location);
 
     res.json({
       success: true,
@@ -57,8 +50,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Upload failed' });
+    console.error('❌ UPLOAD ERROR:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
