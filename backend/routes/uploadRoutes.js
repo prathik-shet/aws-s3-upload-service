@@ -6,17 +6,32 @@ const allowedFolders = require('../utils/allowedFolders');
 
 const router = express.Router();
 
+/**
+ * Normalize folder safely
+ */
+function getSafeFolder(req) {
+  const folder =
+    req.body?.folder ||
+    req.query?.folder ||
+    '';
+
+  return folder.trim().toLowerCase();
+}
+
 const upload = multer({
   storage: multerS3({
     s3,
     bucket: process.env.AWS_BUCKET_NAME,
     acl: 'public-read',
     contentType: multerS3.AUTO_CONTENT_TYPE,
+
     key: (req, file, cb) => {
-      const folder = req.body.folder;
+      const folder = getSafeFolder(req);
+
+      console.log('📁 Folder received:', folder);
 
       if (!allowedFolders.includes(folder)) {
-        return cb(new Error('Invalid folder selected'));
+        return cb(new Error(`Invalid folder selected: ${folder}`));
       }
 
       const ext = file.originalname.split('.').pop();
@@ -25,9 +40,11 @@ const upload = multer({
       cb(null, `${folder}/${filename}`);
     }
   }),
+
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB (image + video)
+    fileSize: 50 * 1024 * 1024 // 50MB
   },
+
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'image/jpeg',
@@ -48,8 +65,7 @@ const upload = multer({
 router.post('/upload', upload.single('file'), (req, res) => {
   res.json({
     success: true,
-    url: req.file.location,
-    type: req.file.mimetype.startsWith('video') ? 'video' : 'image'
+    url: req.file.location
   });
 });
 
