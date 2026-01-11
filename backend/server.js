@@ -6,21 +6,31 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const app = express();
 
 /**
- * ✅ CORS CONFIGURATION
- * Allows frontend hosted on Render + local dev
+ * ✅ CORS CONFIGURATION (FINAL & CORRECT)
+ * Explicitly allows:
+ * - Local development
+ * - Render frontend
+ * Handles preflight (OPTIONS) correctly
  */
-app.use(cors({
+const corsOptions = {
   origin: [
     'http://localhost:5173',
     'https://aws-upload-frontend.onrender.com'
   ],
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
-}));
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  optionsSuccessStatus: 204
+};
 
+// Apply CORS to ALL requests
+app.use(cors(corsOptions));
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
+// Body parser
 app.use(express.json());
 
-// API routes
+// Routes
 app.use('/api', uploadRoutes);
 
 // Health check
@@ -28,7 +38,7 @@ app.get('/', (req, res) => {
   res.send('AWS Upload Service Running');
 });
 
-// IMPORTANT for Render
+// Render requires dynamic port
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

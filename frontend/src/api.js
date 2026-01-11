@@ -1,5 +1,5 @@
 import axios from 'axios';
 
 export default axios.create({
-  baseURL: 'https://aws-upload-backend.onrender.com/api'
+  baseURL: 'https://aws-s3-upload-service.onrender.com/api'
 });
