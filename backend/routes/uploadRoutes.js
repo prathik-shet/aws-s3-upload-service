@@ -1,50 +1,16 @@
 const express = require('express');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
 const s3 = require('../config/s3');
 const allowedFolders = require('../utils/allowedFolders');
 
 const router = express.Router();
 
-/**
- * Normalize folder safely
- */
-function getSafeFolder(req) {
-  const folder =
-    req.body?.folder ||
-    req.query?.folder ||
-    '';
-
-  return folder.trim().toLowerCase();
-}
-
+// Multer memory storage (IMPORTANT)
 const upload = multer({
-  storage: multerS3({
-    s3,
-    bucket: process.env.AWS_BUCKET_NAME,
-    acl: 'public-read',
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-
-    key: (req, file, cb) => {
-      const folder = getSafeFolder(req);
-
-      console.log('📁 Folder received:', folder);
-
-      if (!allowedFolders.includes(folder)) {
-        return cb(new Error(`Invalid folder selected: ${folder}`));
-      }
-
-      const ext = file.originalname.split('.').pop();
-      const filename = `${Date.now()}.${ext}`;
-
-      cb(null, `${folder}/${filename}`);
-    }
-  }),
-
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB
   },
-
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'image/jpeg',
@@ -55,18 +21,45 @@ const upload = multer({
     ];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error('Only images and MP4/WebM videos allowed'));
+      return cb(new Error('Only images and videos allowed'));
     }
 
     cb(null, true);
   }
 });
 
-router.post('/upload', upload.single('file'), (req, res) => {
-  res.json({
-    success: true,
-    url: req.file.location
-  });
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    const folder = (req.body.folder || '').trim().toLowerCase();
+
+    console.log('📁 Folder received:', folder);
+
+    if (!allowedFolders.includes(folder)) {
+      return res.status(400).json({ error: 'Invalid folder selected' });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const key = `${folder}/${Date.now()}.${ext}`;
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      ACL: 'public-read'
+    };
+
+    const result = await s3.upload(params).promise();
+
+    res.json({
+      success: true,
+      url: result.Location
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
 });
 
 module.exports = router;
