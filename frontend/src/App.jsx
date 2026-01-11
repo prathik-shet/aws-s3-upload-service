@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import api from './api';
 
+/**
+ * Folder labels (UI) + values (backend-safe)
+ * Values MUST exactly match backend allowedFolders
+ */
 const folders = [
-  'earrings',
-  'pendants',
-  'finger-rings',
-  'mangalsutra',
-  'chains',
-  'nose-pin',
-  'necklaces',
-  'necklace-set',
-  'bangles',
-  'bracelets',
-  'antique',
-  'custom'
+  { label: 'Earrings', value: 'earrings' },
+  { label: 'Pendants', value: 'pendants' },
+  { label: 'Finger Rings', value: 'finger-rings' },
+  { label: 'Mangalsutra', value: 'mangalsutra' },
+  { label: 'Chains', value: 'chains' },
+  { label: 'Nose Pin', value: 'nose-pin' },
+  { label: 'Necklaces', value: 'necklaces' },
+  { label: 'Necklace Set', value: 'necklace-set' },
+  { label: 'Bangles', value: 'bangles' },
+  { label: 'Bracelets', value: 'bracelets' },
+  { label: 'Antique', value: 'antique' },
+  { label: 'Custom', value: 'custom' }
 ];
 
 function App() {
@@ -44,6 +48,9 @@ function App() {
     }
   };
 
+  const isVideo = (url) =>
+    url.endsWith('.mp4') || url.endsWith('.webm');
+
   return (
     <div style={{ padding: 30, fontFamily: 'Arial' }}>
       <h2>AWS Image / Video Upload Service</h2>
@@ -51,7 +58,9 @@ function App() {
       <label>Choose Category</label><br />
       <select value={folder} onChange={e => setFolder(e.target.value)}>
         {folders.map(f => (
-          <option key={f} value={f}>{f}</option>
+          <option key={f.value} value={f.value}>
+            {f.label}
+          </option>
         ))}
       </select>
 
@@ -77,10 +86,10 @@ function App() {
 
           <br /><br />
 
-          {url.includes('.mp4') ? (
-            <video src={url} controls width="300" />
+          {isVideo(url) ? (
+            <video src={url} controls width="320" />
           ) : (
-            <img src={url} alt="Uploaded" width="300" />
+            <img src={url} alt="Uploaded" width="320" />
           )}
         </>
       )}
