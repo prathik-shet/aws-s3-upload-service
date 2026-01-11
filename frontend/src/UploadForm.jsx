@@ -21,6 +21,7 @@ export default function UploadForm() {
   const [folder, setFolder] = useState('earrings');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const uploadFile = async () => {
     if (!file) return alert('Select an image or video');
@@ -33,6 +34,7 @@ export default function UploadForm() {
       setLoading(true);
       const res = await api.post('/upload', formData);
       setUrl(res.data.url);
+      setCopied(false);
     } catch (err) {
       alert('Upload failed');
       console.error(err);
@@ -52,6 +54,16 @@ export default function UploadForm() {
     } catch (err) {
       alert('Delete failed');
       console.error(err);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      alert('Copy failed');
     }
   };
 
@@ -103,7 +115,16 @@ export default function UploadForm() {
         {url && (
           <div style={styles.result}>
             <p><strong>Uploaded URL</strong></p>
-            <a href={url} target="_blank" rel="noreferrer">{url}</a>
+
+            {/* URL + COPY */}
+            <div style={styles.urlBox}>
+              <a href={url} target="_blank" rel="noreferrer" style={styles.urlText}>
+                {url}
+              </a>
+              <button onClick={copyToClipboard} style={styles.copyBtn}>
+                {copied ? '✅ Copied' : '📋 Copy'}
+              </button>
+            </div>
 
             <div style={{ marginTop: 15 }}>
               {isVideo(url) ? (
@@ -191,6 +212,28 @@ const styles = {
   result: {
     marginTop: 20,
     textAlign: 'center'
+  },
+  urlBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'center',
+    flexWrap: 'wrap'
+  },
+  urlText: {
+    maxWidth: 260,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  copyBtn: {
+    padding: '6px 10px',
+    borderRadius: 6,
+    border: '1px solid #7f1a2b',
+    background: '#fff',
+    color: '#7f1a2b',
+    cursor: 'pointer',
+    fontWeight: 600
   },
   deleteBtn: {
     marginTop: 15,
