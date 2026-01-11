@@ -7,9 +7,7 @@ const app = express();
 
 /**
  * ✅ CORS CONFIGURATION
- * Allows:
- * - Local frontend (Vite)
- * - Render frontend
+ * Allows frontend hosted on Render + local dev
  */
 app.use(cors({
   origin: [
@@ -20,10 +18,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type']
 }));
 
-// Required for JSON parsing
 app.use(express.json());
 
-// Routes
+// API routes
 app.use('/api', uploadRoutes);
 
 // Health check
@@ -31,7 +28,7 @@ app.get('/', (req, res) => {
   res.send('AWS Upload Service Running');
 });
 
-// Render provides PORT automatically
+// IMPORTANT for Render
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
