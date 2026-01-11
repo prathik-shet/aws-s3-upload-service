@@ -1,0 +1,204 @@
+import { useState } from 'react';
+import api from './api';
+
+const folders = [
+  { label: 'Earrings', value: 'earrings' },
+  { label: 'Pendants', value: 'pendants' },
+  { label: 'Finger Rings', value: 'finger-rings' },
+  { label: 'Mangalsutra', value: 'mangalsutra' },
+  { label: 'Chains', value: 'chains' },
+  { label: 'Nose Pin', value: 'nose-pin' },
+  { label: 'Necklaces', value: 'necklaces' },
+  { label: 'Necklace Set', value: 'necklace-set' },
+  { label: 'Bangles', value: 'bangles' },
+  { label: 'Bracelets', value: 'bracelets' },
+  { label: 'Antique', value: 'antique' },
+  { label: 'Custom', value: 'custom' }
+];
+
+export default function UploadForm() {
+  const [file, setFile] = useState(null);
+  const [folder, setFolder] = useState('earrings');
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const uploadFile = async () => {
+    if (!file) return alert('Select an image or video');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    try {
+      setLoading(true);
+      const res = await api.post('/upload', formData);
+      setUrl(res.data.url);
+    } catch (err) {
+      alert('Upload failed');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteFile = async () => {
+    if (!url) return;
+
+    try {
+      await api.post('/delete', { url });
+      alert('File deleted from S3');
+      setUrl('');
+      setFile(null);
+    } catch (err) {
+      alert('Delete failed');
+      console.error(err);
+    }
+  };
+
+  const isVideo = (url) =>
+    url.endsWith('.mp4') || url.endsWith('.webm');
+
+  return (
+    <div style={styles.page}>
+      {/* HEADER */}
+      <header style={styles.header}>
+        <img
+          src="https://vimaleshwara-gold-images.s3.ap-south-1.amazonaws.com/desings/logo.png"
+          alt="Vimaleshwara Jewellers"
+          style={styles.logo}
+        />
+        <h1 style={styles.title}>VIMALESHWARA JEWELLERS</h1>
+        <p style={styles.subtitle}>Admin Upload Panel</p>
+      </header>
+
+      {/* CARD */}
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Upload Jewellery Media</h2>
+
+        <label style={styles.label}>Category</label>
+        <select
+          value={folder}
+          onChange={e => setFolder(e.target.value)}
+          style={styles.select}
+        >
+          {folders.map(f => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+
+        <label style={styles.label}>Select Image / Video</label>
+        <input
+          type="file"
+          accept="image/*,video/mp4,video/webm"
+          onChange={e => setFile(e.target.files[0])}
+          style={styles.input}
+        />
+
+        <button onClick={uploadFile} style={styles.uploadBtn} disabled={loading}>
+          {loading ? 'Uploading...' : 'Upload'}
+        </button>
+
+        {url && (
+          <div style={styles.result}>
+            <p><strong>Uploaded URL</strong></p>
+            <a href={url} target="_blank" rel="noreferrer">{url}</a>
+
+            <div style={{ marginTop: 15 }}>
+              {isVideo(url) ? (
+                <video src={url} controls width="300" />
+              ) : (
+                <img src={url} alt="Uploaded" width="300" />
+              )}
+            </div>
+
+            <button onClick={deleteFile} style={styles.deleteBtn}>
+              Delete from S3
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- STYLES ---------------- */
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    background: '#fff8e6',
+    padding: 30,
+    fontFamily: 'Segoe UI, sans-serif'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: 30
+  },
+  logo: {
+    width: 90,
+    marginBottom: 10
+  },
+  title: {
+    fontFamily: 'Playfair Display, serif',
+    fontSize: 28,
+    color: '#7f1a2b',
+    margin: 0
+  },
+  subtitle: {
+    color: '#555',
+    marginTop: 4
+  },
+  card: {
+    maxWidth: 420,
+    margin: '0 auto',
+    background: '#fff',
+    padding: 25,
+    borderRadius: 16,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+  },
+  cardTitle: {
+    marginBottom: 20,
+    color: '#2e2e2e'
+  },
+  label: {
+    display: 'block',
+    marginBottom: 6,
+    fontWeight: 600
+  },
+  select: {
+    width: '100%',
+    padding: 10,
+    borderRadius: 8,
+    border: '1px solid #ccc',
+    marginBottom: 15
+  },
+  input: {
+    width: '100%',
+    marginBottom: 20
+  },
+  uploadBtn: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 10,
+    background: '#7f1a2b',
+    color: '#fff',
+    border: 'none',
+    fontSize: 16,
+    cursor: 'pointer'
+  },
+  result: {
+    marginTop: 20,
+    textAlign: 'center'
+  },
+  deleteBtn: {
+    marginTop: 15,
+    padding: 10,
+    background: '#c62828',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    cursor: 'pointer'
+  }
+};

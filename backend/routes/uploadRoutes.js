@@ -5,12 +5,18 @@ const allowedFolders = require('../utils/allowedFolders');
 
 const router = express.Router();
 
-// Multer memory storage
+/* ===============================
+   MULTER CONFIG (MEMORY STORAGE)
+   =============================== */
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
+/* ===============================
+   UPLOAD ROUTE
+   POST /api/upload
+   =============================== */
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     console.log('🔍 BODY:', req.body);
@@ -31,12 +37,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const key = `${folder}/${Date.now()}.${ext}`;
 
     const params = {
-  Bucket: process.env.AWS_BUCKET_NAME,
-  Key: key,
-  Body: req.file.buffer,
-  ContentType: req.file.mimetype
-};
-
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype
+    };
 
     console.log('🚀 Uploading to S3:', params.Bucket, params.Key);
 
@@ -52,6 +57,46 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('❌ UPLOAD ERROR:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* ===============================
+   DELETE ROUTE
+   POST /api/delete
+   =============================== */
+router.post('/delete', async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    // Safety check: only allow deleting files from your bucket
+    if (!url.includes(process.env.AWS_BUCKET_NAME)) {
+      return res.status(403).json({ error: 'Invalid S3 file URL' });
+    }
+
+    // Extract S3 object key from URL
+    const key = decodeURIComponent(
+      url.split('.amazonaws.com/')[1]
+    );
+
+    console.log('🗑 Deleting S3 object:', key);
+
+    await s3.deleteObject({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key
+    }).promise();
+
+    res.json({
+      success: true,
+      message: 'File deleted successfully'
+    });
+
+  } catch (err) {
+    console.error('❌ DELETE ERROR:', err);
+    res.status(500).json({ error: 'Delete failed' });
   }
 });
 
