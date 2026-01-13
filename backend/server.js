@@ -5,31 +5,27 @@ const uploadRoutes = require("./routes/uploadRoutes");
 
 const app = express();
 
-/* ===============================
-   BODY PARSER (REQUIRED FOR RENDER)
-   =============================== */
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+/* 🔥 REQUIRED FOR RENDER */
+app.set("trust proxy", 1);
 
 /* ===============================
-   CORS CONFIGURATION
+   BODY PARSER
    =============================== */
-const corsOptions = {
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+/* ===============================
+   CORS
+   =============================== */
+app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://aws-s3-upload-service-frontend.onrender.com"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: false,
-  optionsSuccessStatus: 204
-};
-
-// Apply CORS globally
-app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options("*", cors(corsOptions));
+  credentials: false
+}));
 
 /* ===============================
    ROUTES
@@ -37,7 +33,7 @@ app.options("*", cors(corsOptions));
 app.use("/api", uploadRoutes);
 
 /* ===============================
-   HEALTH CHECK
+   HEALTH
    =============================== */
 app.get("/", (req, res) => {
   res.status(200).send("AWS Upload Service Running ✅");
@@ -48,11 +44,10 @@ app.get("/health", (req, res) => {
 });
 
 /* ===============================
-   GLOBAL ERROR HANDLER
+   ERROR HANDLER
    =============================== */
 app.use((err, req, res, next) => {
   console.error("🔥 SERVER ERROR:", err);
-
   res.status(500).json({
     error: "Internal Server Error",
     message: err.message
@@ -60,10 +55,9 @@ app.use((err, req, res, next) => {
 });
 
 /* ===============================
-   START SERVER (RENDER SAFE)
+   START
    =============================== */
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Upload service running on port ${PORT}`);
 });

@@ -1,5 +1,8 @@
-import axios from 'axios';
+import axios from "axios";
 
-export default axios.create({
-  baseURL: 'https://aws-s3-upload-service-pr2s.onrender.com'
+const api = axios.create({
+  baseURL: "https://aws-s3-upload-service-pr2s.onrender.com/api",
+  withCredentials: false,
 });
+
+export default api;

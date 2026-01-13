@@ -1,6 +1,15 @@
 import { useState } from "react";
-import api from "./api";
+import axios from "axios";
 
+/* ===============================
+   BACKEND URL
+   =============================== */
+const API_BASE =
+  "https://aws-s3-upload-service-pr2s.onrender.com/api";
+
+/* ===============================
+   FOLDERS
+   =============================== */
 const folders = [
   { label: "Earrings", value: "earrings" },
   { label: "Pendants", value: "pendants" },
@@ -31,13 +40,9 @@ export default function UploadForm() {
     const selected = e.target.files[0];
     if (!selected) return;
 
-    // 50MB limit
-    if (selected.size > 50 * 1024 * 1024) {
-      alert("File must be under 50MB");
-      return;
-    }
+    const isVideo = selected.type.startsWith("video/");
+    const isImage = selected.type.startsWith("image/");
 
-    // Image + Video validation
     const allowedTypes = [
       "image/jpeg",
       "image/png",
@@ -47,7 +52,18 @@ export default function UploadForm() {
     ];
 
     if (!allowedTypes.includes(selected.type)) {
-      alert("Only JPG, PNG, WEBP, MP4, WEBM files allowed");
+      alert("Only JPG, PNG, WEBP images or MP4, WEBM videos allowed");
+      return;
+    }
+
+    // Size limits
+    if (isImage && selected.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB");
+      return;
+    }
+
+    if (isVideo && selected.size > 10 * 1024 * 1024) {
+      alert("Video must be under 10MB");
       return;
     }
 
@@ -58,7 +74,7 @@ export default function UploadForm() {
      UPLOAD
      =============================== */
   const uploadFile = async () => {
-    if (!file) return alert("Select an image or video");
+    if (!file) return alert("Select a file first");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -68,20 +84,30 @@ export default function UploadForm() {
       setLoading(true);
       setProgress(0);
 
-      const res = await api.post("/upload", formData, {
-        timeout: 90000, // important for videos
-        onUploadProgress: (e) => {
-          if (!e.total) return;
-          setProgress(Math.round((e.loaded * 100) / e.total));
+      const res = await axios.post(
+        `${API_BASE}/upload`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          },
+          onUploadProgress: (e) => {
+            if (!e.total) return;
+            setProgress(Math.round((e.loaded * 100) / e.total));
+          }
         }
-      });
+      );
 
       setUrl(res.data.url);
       setCopied(false);
 
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.error || "Upload failed");
+      if (err.response) {
+        alert(err.response.data?.error || "Upload failed");
+      } else {
+        alert("Network error — backend not reachable");
+      }
     } finally {
       setLoading(false);
     }
@@ -95,17 +121,17 @@ export default function UploadForm() {
     if (!window.confirm("Delete this file from S3?")) return;
 
     try {
-      await api.post("/delete", { url });
-      alert("File deleted from S3");
+      await axios.post(`${API_BASE}/delete`, { url });
+      alert("File deleted successfully");
       setUrl("");
       setFile(null);
-    } catch (err) {
+    } catch {
       alert("Delete failed");
     }
   };
 
   /* ===============================
-     COPY URL
+     COPY
      =============================== */
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(url);
@@ -113,9 +139,12 @@ export default function UploadForm() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isVideo = (url) =>
-    url.endsWith(".mp4") || url.endsWith(".webm");
+  const isVideoUrl = (u) =>
+    u.endsWith(".mp4") || u.endsWith(".webm");
 
+  /* ===============================
+     UI
+     =============================== */
   return (
     <div style={styles.page}>
       <header style={styles.header}>
@@ -153,7 +182,11 @@ export default function UploadForm() {
           style={styles.input}
         />
 
-        <button onClick={uploadFile} style={styles.uploadBtn} disabled={loading}>
+        <button
+          onClick={uploadFile}
+          style={styles.uploadBtn}
+          disabled={loading}
+        >
           {loading ? `Uploading ${progress}%` : "Upload"}
         </button>
 
@@ -171,7 +204,7 @@ export default function UploadForm() {
             </div>
 
             <div style={{ marginTop: 15 }}>
-              {isVideo(url) ? (
+              {isVideoUrl(url) ? (
                 <video src={url} controls width="300" />
               ) : (
                 <img src={url} alt="Uploaded" width="300" loading="lazy" />
@@ -188,21 +221,19 @@ export default function UploadForm() {
   );
 }
 
-/* styles unchanged */
-
-
-
-/* ---------------- STYLES ---------------- */
+/* ===============================
+   STYLES (UNCHANGED)
+   =============================== */
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: '#fff8e6',
+    minHeight: "100vh",
+    background: "#fff8e6",
     padding: 30,
-    fontFamily: 'Segoe UI, sans-serif'
+    fontFamily: "Segoe UI, sans-serif"
   },
   header: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 30
   },
   logo: {
@@ -210,86 +241,86 @@ const styles = {
     marginBottom: 10
   },
   title: {
-    fontFamily: 'Playfair Display, serif',
+    fontFamily: "Playfair Display, serif",
     fontSize: 28,
-    color: '#7f1a2b',
+    color: "#7f1a2b",
     margin: 0
   },
   subtitle: {
-    color: '#555',
+    color: "#555",
     marginTop: 4
   },
   card: {
     maxWidth: 420,
-    margin: '0 auto',
-    background: '#fff',
+    margin: "0 auto",
+    background: "#fff",
     padding: 25,
     borderRadius: 16,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+    boxShadow: "0 10px 30px rgba(0,0,0,0.08)"
   },
   cardTitle: {
     marginBottom: 20,
-    color: '#2e2e2e'
+    color: "#2e2e2e"
   },
   label: {
-    display: 'block',
+    display: "block",
     marginBottom: 6,
     fontWeight: 600
   },
   select: {
-    width: '100%',
+    width: "100%",
     padding: 10,
     borderRadius: 8,
-    border: '1px solid #ccc',
+    border: "1px solid #ccc",
     marginBottom: 15
   },
   input: {
-    width: '100%',
+    width: "100%",
     marginBottom: 20
   },
   uploadBtn: {
-    width: '100%',
+    width: "100%",
     padding: 12,
     borderRadius: 10,
-    background: '#7f1a2b',
-    color: '#fff',
-    border: 'none',
+    background: "#7f1a2b",
+    color: "#fff",
+    border: "none",
     fontSize: 16,
-    cursor: 'pointer'
+    cursor: "pointer"
   },
   result: {
     marginTop: 20,
-    textAlign: 'center'
+    textAlign: "center"
   },
   urlBox: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
     gap: 10,
-    justifyContent: 'center',
-    flexWrap: 'wrap'
+    justifyContent: "center",
+    flexWrap: "wrap"
   },
   urlText: {
     maxWidth: 260,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
   },
   copyBtn: {
-    padding: '6px 10px',
+    padding: "6px 10px",
     borderRadius: 6,
-    border: '1px solid #7f1a2b',
-    background: '#fff',
-    color: '#7f1a2b',
-    cursor: 'pointer',
+    border: "1px solid #7f1a2b",
+    background: "#fff",
+    color: "#7f1a2b",
+    cursor: "pointer",
     fontWeight: 600
   },
   deleteBtn: {
     marginTop: 15,
     padding: 10,
-    background: '#c62828',
-    color: '#fff',
-    border: 'none',
+    background: "#c62828",
+    color: "#fff",
+    border: "none",
     borderRadius: 8,
-    cursor: 'pointer'
+    cursor: "pointer"
   }
 };
