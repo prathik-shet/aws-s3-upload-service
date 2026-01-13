@@ -1,11 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
-
-/* ===============================
-   BACKEND URL
-   =============================== */
-const API_BASE =
-  "https://aws-s3-upload-service-pr2s.onrender.com/api";
+import api from "./api"; // ✅ IMPORTANT: use central api instance
 
 /* ===============================
    FOLDERS
@@ -40,9 +34,6 @@ export default function UploadForm() {
     const selected = e.target.files[0];
     if (!selected) return;
 
-    const isVideo = selected.type.startsWith("video/");
-    const isImage = selected.type.startsWith("image/");
-
     const allowedTypes = [
       "image/jpeg",
       "image/png",
@@ -56,7 +47,9 @@ export default function UploadForm() {
       return;
     }
 
-    // Size limits
+    const isImage = selected.type.startsWith("image/");
+    const isVideo = selected.type.startsWith("video/");
+
     if (isImage && selected.size > 5 * 1024 * 1024) {
       alert("Image must be under 5MB");
       return;
@@ -84,30 +77,22 @@ export default function UploadForm() {
       setLoading(true);
       setProgress(0);
 
-      const res = await axios.post(
-        `${API_BASE}/upload`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          },
-          onUploadProgress: (e) => {
-            if (!e.total) return;
-            setProgress(Math.round((e.loaded * 100) / e.total));
-          }
+      const res = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        },
+        onUploadProgress: (e) => {
+          if (!e.total) return;
+          setProgress(Math.round((e.loaded * 100) / e.total));
         }
-      );
+      });
 
       setUrl(res.data.url);
       setCopied(false);
 
     } catch (err) {
       console.error(err);
-      if (err.response) {
-        alert(err.response.data?.error || "Upload failed");
-      } else {
-        alert("Network error — backend not reachable");
-      }
+      alert(err.response?.data?.error || "Upload failed");
     } finally {
       setLoading(false);
     }
@@ -121,7 +106,7 @@ export default function UploadForm() {
     if (!window.confirm("Delete this file from S3?")) return;
 
     try {
-      await axios.post(`${API_BASE}/delete`, { url });
+      await api.post("/delete", { url });
       alert("File deleted successfully");
       setUrl("");
       setFile(null);
@@ -139,8 +124,7 @@ export default function UploadForm() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isVideoUrl = (u) =>
-    u.endsWith(".mp4") || u.endsWith(".webm");
+  const isVideo = (u) => u.endsWith(".mp4") || u.endsWith(".webm");
 
   /* ===============================
      UI
@@ -204,7 +188,7 @@ export default function UploadForm() {
             </div>
 
             <div style={{ marginTop: 15 }}>
-              {isVideoUrl(url) ? (
+              {isVideo(url) ? (
                 <video src={url} controls width="300" />
               ) : (
                 <img src={url} alt="Uploaded" width="300" loading="lazy" />
