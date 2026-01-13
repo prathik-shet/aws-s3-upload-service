@@ -17,7 +17,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 const corsOptions = {
   origin: [
     "http://localhost:5173",
-    "https://aws-upload-frontend.onrender.com"
+    "https://aws-s3-upload-service-frontend.onrender.com"
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
