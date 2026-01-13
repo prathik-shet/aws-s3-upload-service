@@ -1,99 +1,144 @@
-import { useState } from 'react';
-import api from './api';
+import { useState } from "react";
+import api from "./api";
 
 const folders = [
-  { label: 'Earrings', value: 'earrings' },
-  { label: 'Pendants', value: 'pendants' },
-  { label: 'Finger Rings', value: 'finger-rings' },
-  { label: 'Mangalsutra', value: 'mangalsutra' },
-  { label: 'Chains', value: 'chains' },
-  { label: 'Nose Pin', value: 'nose-pin' },
-  { label: 'Necklaces', value: 'necklaces' },
-  { label: 'Necklace Set', value: 'necklace-set' },
-  { label: 'Bangles', value: 'bangles' },
-  { label: 'Bracelets', value: 'bracelets' },
-  { label: 'Antique', value: 'antique' },
-  { label: 'Custom', value: 'custom' }
+  { label: "Earrings", value: "earrings" },
+  { label: "Pendants", value: "pendants" },
+  { label: "Finger Rings", value: "finger-rings" },
+  { label: "Mangalsutra", value: "mangalsutra" },
+  { label: "Chains", value: "chains" },
+  { label: "Nose Pin", value: "nose-pin" },
+  { label: "Necklaces", value: "necklaces" },
+  { label: "Necklace Set", value: "necklace-set" },
+  { label: "Bangles", value: "bangles" },
+  { label: "Bracelets", value: "bracelets" },
+  { label: "Antique", value: "antique" },
+  { label: "Custom", value: "custom" }
 ];
 
 export default function UploadForm() {
   const [file, setFile] = useState(null);
-  const [folder, setFolder] = useState('earrings');
-  const [url, setUrl] = useState('');
+  const [folder, setFolder] = useState("earrings");
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
 
+  /* ===============================
+     FILE SELECT
+     =============================== */
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (!selected) return;
+
+    // 50MB limit
+    if (selected.size > 50 * 1024 * 1024) {
+      alert("File must be under 50MB");
+      return;
+    }
+
+    // Image + Video validation
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "video/mp4",
+      "video/webm"
+    ];
+
+    if (!allowedTypes.includes(selected.type)) {
+      alert("Only JPG, PNG, WEBP, MP4, WEBM files allowed");
+      return;
+    }
+
+    setFile(selected);
+  };
+
+  /* ===============================
+     UPLOAD
+     =============================== */
   const uploadFile = async () => {
-    if (!file) return alert('Select an image or video');
+    if (!file) return alert("Select an image or video");
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', folder);
+    formData.append("file", file);
+    formData.append("folder", folder);
 
     try {
       setLoading(true);
-      const res = await api.post('/upload', formData);
+      setProgress(0);
+
+      const res = await api.post("/upload", formData, {
+        timeout: 90000, // important for videos
+        onUploadProgress: (e) => {
+          if (!e.total) return;
+          setProgress(Math.round((e.loaded * 100) / e.total));
+        }
+      });
+
       setUrl(res.data.url);
       setCopied(false);
+
     } catch (err) {
-      alert('Upload failed');
       console.error(err);
+      alert(err?.response?.data?.error || "Upload failed");
     } finally {
       setLoading(false);
     }
   };
 
+  /* ===============================
+     DELETE
+     =============================== */
   const deleteFile = async () => {
     if (!url) return;
+    if (!window.confirm("Delete this file from S3?")) return;
 
     try {
-      await api.post('/delete', { url });
-      alert('File deleted from S3');
-      setUrl('');
+      await api.post("/delete", { url });
+      alert("File deleted from S3");
+      setUrl("");
       setFile(null);
     } catch (err) {
-      alert('Delete failed');
-      console.error(err);
+      alert("Delete failed");
     }
   };
 
+  /* ===============================
+     COPY URL
+     =============================== */
   const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      alert('Copy failed');
-    }
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const isVideo = (url) =>
-    url.endsWith('.mp4') || url.endsWith('.webm');
+    url.endsWith(".mp4") || url.endsWith(".webm");
 
   return (
     <div style={styles.page}>
-      {/* HEADER */}
       <header style={styles.header}>
         <img
           src="https://vimaleshwara-gold-images.s3.ap-south-1.amazonaws.com/desings/logo.png"
           alt="Vimaleshwara Jewellers"
           style={styles.logo}
+          loading="lazy"
         />
         <h1 style={styles.title}>VIMALESHWARA JEWELLERS</h1>
         <p style={styles.subtitle}>Admin Upload Panel</p>
       </header>
 
-      {/* CARD */}
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Upload Jewellery Media</h2>
 
         <label style={styles.label}>Category</label>
         <select
           value={folder}
-          onChange={e => setFolder(e.target.value)}
+          onChange={(e) => setFolder(e.target.value)}
           style={styles.select}
         >
-          {folders.map(f => (
+          {folders.map((f) => (
             <option key={f.value} value={f.value}>
               {f.label}
             </option>
@@ -104,25 +149,24 @@ export default function UploadForm() {
         <input
           type="file"
           accept="image/*,video/mp4,video/webm"
-          onChange={e => setFile(e.target.files[0])}
+          onChange={handleFileChange}
           style={styles.input}
         />
 
         <button onClick={uploadFile} style={styles.uploadBtn} disabled={loading}>
-          {loading ? 'Uploading...' : 'Upload'}
+          {loading ? `Uploading ${progress}%` : "Upload"}
         </button>
 
         {url && (
           <div style={styles.result}>
             <p><strong>Uploaded URL</strong></p>
 
-            {/* URL + COPY */}
             <div style={styles.urlBox}>
               <a href={url} target="_blank" rel="noreferrer" style={styles.urlText}>
                 {url}
               </a>
               <button onClick={copyToClipboard} style={styles.copyBtn}>
-                {copied ? '✅ Copied' : '📋 Copy'}
+                {copied ? "✅ Copied" : "📋 Copy"}
               </button>
             </div>
 
@@ -130,7 +174,7 @@ export default function UploadForm() {
               {isVideo(url) ? (
                 <video src={url} controls width="300" />
               ) : (
-                <img src={url} alt="Uploaded" width="300" />
+                <img src={url} alt="Uploaded" width="300" loading="lazy" />
               )}
             </div>
 
@@ -143,6 +187,10 @@ export default function UploadForm() {
     </div>
   );
 }
+
+/* styles unchanged */
+
+
 
 /* ---------------- STYLES ---------------- */
 
