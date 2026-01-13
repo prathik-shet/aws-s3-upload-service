@@ -48,13 +48,13 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const key = `${folder}/${Date.now()}.${ext}`;
 
     const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-      ACL: "public-read",
-      CacheControl: "public, max-age=31536000"
-    };
+  Bucket: process.env.AWS_BUCKET_NAME,
+  Key: key,
+  Body: req.file.buffer,
+  ContentType: req.file.mimetype,
+  CacheControl: "public, max-age=31536000"
+};
+
 
     const result = await s3.upload(params).promise();
 
