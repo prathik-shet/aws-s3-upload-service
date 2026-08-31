@@ -29,6 +29,7 @@ export default function UploadForm() {
   const [bulkFiles, setBulkFiles] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
   /* ===============================
      FILE SELECT
@@ -79,6 +80,7 @@ export default function UploadForm() {
     try {
       setLoading(true);
       setProgress(0);
+      console.log("📤 Uploading file:", file.name, "to folder:", folder);
 
       const res = await api.post("/upload", formData, {
         headers: {
@@ -90,12 +92,22 @@ export default function UploadForm() {
         }
       });
 
+      console.log("✅ Upload successful! Response:", res.data);
+      
+      if (!res.data.url) {
+        console.error("❌ No URL in response:", res.data);
+        return alert("Upload successful but no URL returned. Check server logs.");
+      }
+
       setUrl(res.data.url);
+      setImageError(false);
       setCopied(false);
+      alert("✅ Upload successful! Scroll down to see your image.");
 
     } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || "Upload failed");
+      console.error("❌ Upload error:", err);
+      const errorMsg = err.response?.data?.error || err.message || "Upload failed";
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -286,10 +298,31 @@ export default function UploadForm() {
             </div>
 
             <div style={{ marginTop: 15 }}>
-              {isVideo(url) ? (
-                <video src={url} controls width="300" />
-              ) : (
-                <img src={url} alt="Uploaded" width="300" loading="lazy" />
+              {imageError && (
+                <div style={{ color: "red", padding: "10px", backgroundColor: "#ffe6e6", borderRadius: "4px" }}>
+                  ❌ Failed to load image from S3. The URL might not be publicly accessible.<br/>
+                  <small>Make sure your S3 bucket has public read permissions.</small>
+                </div>
+              )}
+              {!imageError && (
+                isVideo(url) ? (
+                  <video src={url} controls width="300" onError={() => setImageError(true)} />
+                ) : (
+                  <img 
+                    src={url} 
+                    alt="Uploaded" 
+                    width="300" 
+                    loading="lazy"
+                    onError={() => {
+                      console.error("❌ Image failed to load from:", url);
+                      setImageError(true);
+                    }}
+                    onLoad={() => {
+                      console.log("✅ Image loaded successfully from:", url);
+                      setImageError(false);
+                    }}
+                  />
+                )
               )}
             </div>
 

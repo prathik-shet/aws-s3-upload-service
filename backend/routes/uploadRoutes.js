@@ -127,10 +127,12 @@ router.post("/upload/bulk", upload.array("files", 100), async (req, res) => {
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
+      console.error("❌ No file received");
       return res.status(400).json({ error: "File not received" });
     }
 
     if (!allowedTypes.includes(req.file.mimetype)) {
+      console.error("❌ Invalid file type:", req.file.mimetype);
       return res.status(400).json({
         error: "Only JPG, PNG, WEBP, MP4, WEBM allowed"
       });
@@ -138,10 +140,15 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     const folder = (req.body.folder || "").trim().toLowerCase();
     if (!allowedFolders.includes(folder)) {
+      console.error("❌ Invalid folder:", folder);
       return res.status(400).json({ error: "Invalid folder" });
     }
 
+    console.log("📤 Uploading file:", req.file.originalname, "to folder:", folder);
+    
     const uploadedFile = await uploadToS3(req.file, folder);
+
+    console.log("✅ File uploaded successfully:", uploadedFile.url);
 
     res.json({
       success: true,
@@ -150,7 +157,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ UPLOAD ERROR:", err);
+    console.error("❌ UPLOAD ERROR:", err.message);
     res.status(500).json({
       error: "Upload failed",
       message: err.message
