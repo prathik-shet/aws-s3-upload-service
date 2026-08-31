@@ -24,6 +24,55 @@ const allowedTypes = [
   "video/webm"
 ];
 
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+
+const uploadToS3 = (file, folder, suffix = "") => {
+  const ext = file.mimetype.split("/")[1];
+  const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}${suffix}.${ext}`;
+
+  return s3.upload({
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+    CacheControl: "public, max-age=31536000"
+  }).promise().then((result) => ({
+    name: file.originalname,
+    url: result.Location,
+    key
+  }));
+};
+
+/* ===============================
+   BULK IMAGE UPLOAD
+   =============================== */
+router.post("/upload/bulk", upload.array("files", 100), async (req, res) => {
+  try {
+    if (!req.files?.length) {
+      return res.status(400).json({ error: "No images received" });
+    }
+
+    const folder = (req.body.folder || "").trim().toLowerCase();
+    if (!allowedFolders.includes(folder)) {
+      return res.status(400).json({ error: "Invalid folder" });
+    }
+
+    const invalidFile = req.files.find((file) => !allowedImageTypes.includes(file.mimetype));
+    if (invalidFile) {
+      return res.status(400).json({ error: "Bulk upload supports JPG, PNG, and WEBP images only" });
+    }
+
+    const files = await Promise.all(
+      req.files.map((file, index) => uploadToS3(file, folder, `-${index}`))
+    );
+
+    res.json({ success: true, files });
+  } catch (err) {
+    console.error("BULK UPLOAD ERROR:", err);
+    res.status(500).json({ error: "Bulk upload failed", message: err.message });
+  }
+});
+
 /* ===============================
    UPLOAD
    =============================== */
@@ -44,24 +93,12 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Invalid folder" });
     }
 
-    const ext = req.file.mimetype.split("/")[1];
-    const key = `${folder}/${Date.now()}.${ext}`;
-
-    const params = {
-  Bucket: process.env.AWS_BUCKET_NAME,
-  Key: key,
-  Body: req.file.buffer,
-  ContentType: req.file.mimetype,
-  CacheControl: "public, max-age=31536000"
-};
-
-
-    const result = await s3.upload(params).promise();
+    const uploadedFile = await uploadToS3(req.file, folder);
 
     res.json({
       success: true,
-      url: result.Location,
-      key
+      url: uploadedFile.url,
+      key: uploadedFile.key
     });
 
   } catch (err) {

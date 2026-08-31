@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import api from "./api"; // ✅ IMPORTANT: use central api instance
 
 /* ===============================
@@ -26,6 +27,10 @@ export default function UploadForm() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [bulkFiles, setBulkFiles] = useState([]);
+  const [bulkResults, setBulkResults] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
 
   /* ===============================
      FILE SELECT
@@ -96,6 +101,62 @@ export default function UploadForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkFolderChange = (e) => {
+    const selected = Array.from(e.target.files || []);
+    const imageFiles = selected.filter((selectedFile) => selectedFile.type.startsWith("image/"));
+
+    if (!imageFiles.length) {
+      setBulkFiles([]);
+      return alert("Select a folder containing JPG, PNG, or WEBP images");
+    }
+
+    if (imageFiles.length > 100) {
+      return alert("Select no more than 100 images at a time");
+    }
+
+    const oversized = imageFiles.find((selectedFile) => selectedFile.size > 5 * 1024 * 1024);
+    if (oversized) {
+      return alert(`${oversized.name} is over the 5MB image limit`);
+    }
+
+    setBulkFiles(imageFiles);
+    setBulkResults([]);
+    e.target.value = "";
+  };
+
+  const uploadBulk = async () => {
+    if (!bulkFiles.length) return alert("Select a folder of images first");
+
+    const formData = new FormData();
+    bulkFiles.forEach((bulkFile) => formData.append("files", bulkFile));
+    formData.append("folder", folder);
+
+    try {
+      setBulkLoading(true);
+      setBulkProgress(0);
+      const res = await api.post("/upload/bulk", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e) => {
+          if (e.total) setBulkProgress(Math.round((e.loaded * 100) / e.total));
+        }
+      });
+      setBulkResults(res.data.files || []);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Bulk upload failed");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const downloadExcel = () => {
+    const rows = bulkResults.map(({ name, url }) => ({ fileName: name, url }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Image Links");
+    XLSX.writeFile(workbook, `${folder}-image-links.xlsx`);
   };
 
   /* ===============================
@@ -174,6 +235,35 @@ export default function UploadForm() {
           {loading ? `Uploading ${progress}%` : "Upload"}
         </button>
 
+        <div style={styles.bulkSection}>
+          <h3 style={styles.bulkTitle}>Bulk upload images</h3>
+          <p style={styles.bulkHint}>Choose a folder and create an Excel file with every image link.</p>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            webkitdirectory=""
+            directory=""
+            onChange={handleBulkFolderChange}
+            style={styles.input}
+          />
+          {bulkFiles.length > 0 && (
+            <p style={styles.fileCount}>{bulkFiles.length} image{bulkFiles.length === 1 ? "" : "s"} selected</p>
+          )}
+          <button
+            onClick={uploadBulk}
+            style={styles.bulkBtn}
+            disabled={bulkLoading || loading || !bulkFiles.length}
+          >
+            {bulkLoading ? `Uploading ${bulkProgress}%` : "Upload folder"}
+          </button>
+          {bulkResults.length > 0 && (
+            <button onClick={downloadExcel} style={styles.downloadBtn}>
+              Download Excel ({bulkResults.length} links)
+            </button>
+          )}
+        </div>
+
         {url && (
           <div style={styles.result}>
             <p><strong>Uploaded URL</strong></p>
@@ -246,6 +336,25 @@ const styles = {
     marginBottom: 20,
     color: "#2e2e2e"
   },
+  bulkSection: {
+    marginTop: 28,
+    paddingTop: 22,
+    borderTop: "1px solid #eadfca"
+  },
+  bulkTitle: {
+    margin: "0 0 6px",
+    color: "#7f1a2b"
+  },
+  bulkHint: {
+    margin: "0 0 14px",
+    color: "#666",
+    fontSize: 14
+  },
+  fileCount: {
+    margin: "-8px 0 14px",
+    color: "#555",
+    fontSize: 14
+  },
   label: {
     display: "block",
     marginBottom: 6,
@@ -271,6 +380,27 @@ const styles = {
     border: "none",
     fontSize: 16,
     cursor: "pointer"
+  },
+  bulkBtn: {
+    width: "100%",
+    padding: 12,
+    borderRadius: 10,
+    background: "#2e6b57",
+    color: "#fff",
+    border: "none",
+    fontSize: 16,
+    cursor: "pointer"
+  },
+  downloadBtn: {
+    width: "100%",
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    background: "#fff",
+    color: "#2e6b57",
+    border: "1px solid #2e6b57",
+    cursor: "pointer",
+    fontWeight: 600
   },
   result: {
     marginTop: 20,
