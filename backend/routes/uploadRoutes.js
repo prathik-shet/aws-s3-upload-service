@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const ExcelJS = require("exceljs");
 const s3 = require("../config/s3");
 const allowedFolders = require("../utils/allowedFolders");
 
@@ -44,6 +45,35 @@ const uploadToS3 = (file, folder, suffix = "") => {
 };
 
 /* ===============================
+   CREATE EXCEL FILE FROM URLS
+   =============================== */
+const createExcelFromUrls = async (imageUrls) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Images");
+
+  // Add header
+  worksheet.columns = [
+    { header: "Image URL", key: "url", width: 80 }
+  ];
+
+  // Style header
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.getRow(1).alignment = { horizontal: "left", vertical: "center" };
+
+  // Add image URLs
+  imageUrls.forEach((url) => {
+    worksheet.addRow({ url });
+  });
+
+  // Auto-fit columns
+  worksheet.columns.forEach((column) => {
+    column.width = Math.max(20, column.width);
+  });
+
+  return workbook;
+};
+
+/* ===============================
    BULK IMAGE UPLOAD
    =============================== */
 router.post("/upload/bulk", upload.array("files", 100), async (req, res) => {
@@ -66,7 +96,25 @@ router.post("/upload/bulk", upload.array("files", 100), async (req, res) => {
       req.files.map((file, index) => uploadToS3(file, folder, `-${index}`))
     );
 
-    res.json({ success: true, files });
+    // Extract image URLs
+    const imageUrls = files.map((file) => file.url);
+
+    // Create Excel workbook
+    const workbook = await createExcelFromUrls(imageUrls);
+
+    // Set response headers for Excel file download
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bulk-images-${Date.now()}.xlsx"`
+    );
+
+    // Write Excel file to response
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     console.error("BULK UPLOAD ERROR:", err);
     res.status(500).json({ error: "Bulk upload failed", message: err.message });

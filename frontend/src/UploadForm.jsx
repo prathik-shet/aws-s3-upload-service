@@ -1,5 +1,4 @@
 import { useState } from "react";
-import * as XLSX from "xlsx";
 import api from "./api"; // ✅ IMPORTANT: use central api instance
 
 /* ===============================
@@ -28,7 +27,6 @@ export default function UploadForm() {
   const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
   const [bulkFiles, setBulkFiles] = useState([]);
-  const [bulkResults, setBulkResults] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
 
@@ -122,7 +120,6 @@ export default function UploadForm() {
     }
 
     setBulkFiles(imageFiles);
-    setBulkResults([]);
     e.target.value = "";
   };
 
@@ -138,11 +135,33 @@ export default function UploadForm() {
       setBulkProgress(0);
       const res = await api.post("/upload/bulk", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        responseType: "blob",
         onUploadProgress: (e) => {
           if (e.total) setBulkProgress(Math.round((e.loaded * 100) / e.total));
         }
       });
-      setBulkResults(res.data.files || []);
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = res.headers["content-disposition"];
+      let filename = `bulk-images-${Date.now()}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=\"([^\"]+)\"/);
+        if (filenameMatch) filename = filenameMatch[1];
+      }
+
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Clear bulk files after successful upload
+      setBulkFiles([]);
+      alert(`✅ Uploaded ${bulkFiles.length} image(s)! Excel file downloaded.`);
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Bulk upload failed");
@@ -151,13 +170,7 @@ export default function UploadForm() {
     }
   };
 
-  const downloadExcel = () => {
-    const rows = bulkResults.map(({ name, url }) => ({ fileName: name, url }));
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Image Links");
-    XLSX.writeFile(workbook, `${folder}-image-links.xlsx`);
-  };
+
 
   /* ===============================
      DELETE
@@ -257,11 +270,6 @@ export default function UploadForm() {
           >
             {bulkLoading ? `Uploading ${bulkProgress}%` : "Upload folder"}
           </button>
-          {bulkResults.length > 0 && (
-            <button onClick={downloadExcel} style={styles.downloadBtn}>
-              Download Excel ({bulkResults.length} links)
-            </button>
-          )}
         </div>
 
         {url && (
